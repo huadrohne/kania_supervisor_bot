@@ -9,7 +9,6 @@ from telegram.ext import (
     filters,
     JobQueue,
 )
-
 import os
 
 BRANDING_PATH = "branding.png"
@@ -17,10 +16,10 @@ BRANDING_PATH = "branding.png"
 # Tastaturen
 main_keyboard = [['🚛 LOGIN FAHRER', '💻 LOGIN CEO']]
 main_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True, one_time_keyboard=False)
-back_keyboard = [['🔙 ZURÜCK']]
-back_markup = ReplyKeyboardMarkup(back_keyboard, resize_keyboard=True, one_time_keyboard=False)
+back_markup = ReplyKeyboardMarkup([['🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
+ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
 
-# Zeit in Minuten für Auto-Reset (aktuell: 2 Minuten für Tests)
+# Inaktivitätszeit für Test (2 Minuten)
 RESET_MINUTES = 2
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -32,12 +31,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await context.bot.send_message(chat_id, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
     context.user_data["last_message"] = msg.message_id
     context.user_data["last_active"] = datetime.datetime.utcnow()
+    context.user_data["state"] = "start"
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     chat_id = update.effective_chat.id
-
-    # Merke letzte Aktivität
     context.user_data["last_active"] = datetime.datetime.utcnow()
 
     # Letzte Bot-Antwort löschen
@@ -46,7 +44,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.delete_message(chat_id, context.user_data["last_message"])
         except:
             pass
-
     try:
         await update.message.delete()
     except:
@@ -54,20 +51,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if msg == '🚛 LOGIN FAHRER':
         msg_sent = await context.bot.send_message(chat_id, "✅ Willkommen auf der Fahrer Plattform", reply_markup=back_markup)
-        context.user_data["last_message"] = msg_sent.message_id
+        context.user_data.update({"last_message": msg_sent.message_id, "state": "fahrer"})
         branding_msg = await context.bot.send_photo(chat_id, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await branding_msg.delete()
 
     elif msg == '💻 LOGIN CEO':
-        msg_sent = await context.bot.send_message(chat_id, "✅ Willkommen auf der CEO Plattform", reply_markup=back_markup)
-        context.user_data["last_message"] = msg_sent.message_id
+        msg_sent = await context.bot.send_message(chat_id, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
+        context.user_data.update({"last_message": msg_sent.message_id, "state": "ceo"})
         branding_msg = await context.bot.send_photo(chat_id, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await branding_msg.delete()
 
+    elif msg == '🏢 FIRMA':
+        msg_sent = await context.bot.send_message(chat_id, "📁 Firmenübersicht (Platzhalter)", reply_markup=back_markup)
+        context.user_data.update({"last_message": msg_sent.message_id, "state": "firma"})
+
     elif msg == '🔙 ZURÜCK':
-        msg_sent = await context.bot.send_message(chat_id, "🔄 Zurück zum Hauptmenü", reply_markup=main_markup)
+        previous_state = context.user_data.get("state", "start")
+        if previous_state == "ceo" or previous_state == "firma":
+            msg_sent = await context.bot.send_message(chat_id, "🔙 Zurück zur CEO Plattform", reply_markup=ceo_markup)
+            context.user_data["state"] = "ceo"
+        else:
+            msg_sent = await context.bot.send_message(chat_id, "🔄 Zurück zum Hauptmenü", reply_markup=main_markup)
+            context.user_data["state"] = "start"
         context.user_data["last_message"] = msg_sent.message_id
 
     else:
@@ -82,6 +89,7 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             msg = await context.bot.send_message(chat_id, "⏳ Automatischer Reset wegen Inaktivität", reply_markup=main_markup)
             context.chat_data[chat_id]["last_message"] = msg.message_id
             context.chat_data[chat_id]["last_active"] = now
+            context.chat_data[chat_id]["state"] = "start"
 
 if __name__ == '__main__':
     TOKEN = os.getenv("BOT_TOKEN")
