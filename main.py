@@ -15,12 +15,12 @@ BRANDING_PATH = "branding.png"
 # Tastaturen
 main_keyboard = [['🚛 LOGIN FAHRER', '💻 LOGIN CEO']]
 main_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True, one_time_keyboard=False)
-back_markup = ReplyKeyboardMarkup([['🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
-ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
-firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
-fahrer_button_markup = ReplyKeyboardMarkup([['🔙 ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
+back_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
+ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
+firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
+fahrer_markup = ReplyKeyboardMarkup([['👁️ ÜBERSICHT', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=False)
 
-RESET_MINUTES = 2  # für Testphase
+RESET_MINUTES = 2  # Testphase
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -41,7 +41,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     context.user_data["last_active"] = datetime.datetime.utcnow()
 
-    # Letzte Nachricht löschen
     if "last_message" in context.user_data:
         try:
             await context.bot.delete_message(chat_id, context.user_data["last_message"])
@@ -71,16 +70,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.update({"last_message": msg_sent.message_id, "state": "firma", "prev_state": "ceo"})
 
     elif msg == '👷 FAHRER':
-        msg_sent = await context.bot.send_message(chat_id, "👷 Fahrerübersicht (Platzhalter)", reply_markup=fahrer_button_markup)
+        msg_sent = await context.bot.send_message(chat_id, "👷 Fahrerbereich", reply_markup=fahrer_markup)
         context.user_data.update({"last_message": msg_sent.message_id, "state": "fahrerverwaltung", "prev_state": "firma"})
 
-    elif msg == '🔙 ZURÜCK':
+    elif msg == '👁️ ÜBERSICHT':
+        msg_sent = await context.bot.send_message(chat_id, "🗂️ Fahrerübersicht (Platzhalter)", reply_markup=fahrer_markup)
+        context.user_data.update({"last_message": msg_sent.message_id})
+
+    elif msg == '🔄 ERSATZ':
+        msg_sent = await context.bot.send_message(chat_id, "🔁 Ersatzfahrerverwaltung (Platzhalter)", reply_markup=fahrer_markup)
+        context.user_data.update({"last_message": msg_sent.message_id})
+
+    elif msg == '⬅️ ZURÜCK':
         previous = context.user_data.get("prev_state", "start")
         if previous == "ceo":
             msg_sent = await context.bot.send_message(chat_id, "🔙 Zurück zur CEO Plattform", reply_markup=ceo_markup)
             context.user_data.update({"last_message": msg_sent.message_id, "state": "ceo", "prev_state": "start"})
         elif previous == "firma":
             msg_sent = await context.bot.send_message(chat_id, "📁 Zurück zur Firmenübersicht", reply_markup=firma_markup)
+            context.user_data.update({"last_message": msg_sent.message_id, "state": "firma", "prev_state": "ceo"})
+        elif previous == "fahrerverwaltung":
+            msg_sent = await context.bot.send_message(chat_id, "👷 Zurück zum Fahrerbereich", reply_markup=firma_markup)
             context.user_data.update({"last_message": msg_sent.message_id, "state": "firma", "prev_state": "ceo"})
         else:
             msg_sent = await context.bot.send_message(chat_id, "🔄 Zurück zum Hauptmenü", reply_markup=main_markup)
