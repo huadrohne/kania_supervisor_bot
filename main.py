@@ -21,6 +21,7 @@ ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyb
 firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 fahrer_markup = ReplyKeyboardMarkup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
+fahrer_login_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
@@ -54,11 +55,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["status_msg"] = None
 
     if msg == "🚚 LOGIN FAHRER":
-        m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_markup)
+        m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_login_markup)
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await img.delete()
         chat_state["state"] = "login_fahrer"
+        chat_state["status_msg"] = m.message_id
 
     elif msg == "👔 LOGIN CEO":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
@@ -66,6 +68,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await asyncio.sleep(3)
         await img.delete()
         chat_state["state"] = "ceo"
+        chat_state["status_msg"] = m.message_id
 
     elif msg == "🏢 FIRMA":
         m = await context.bot.send_message(cid, "Firmenbereich", reply_markup=firma_markup)
@@ -96,92 +99,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             m = await context.bot.send_message(cid, "⬅️ Zurück zum Firmenbereich", reply_markup=firma_markup)
             chat_state["state"] = "firma"
             chat_state["status_msg"] = m.message_id
+        elif chat_state.get("state") == "login_fahrer":
+            m = await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
+            chat_state["state"] = "start"
+            chat_state["status_msg"] = m.message_id
         else:
             await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
             chat_state["state"] = "start"
 
-# Fahrer anlegen
-async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.delete()
-    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:", reply_markup=ReplyKeyboardRemove())
-    return VORNAME
-
-async def vorname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"] = {"vorname": update.message.text}
-    await update.message.delete()
-    await update.message.reply_text("Nachname:", reply_markup=ReplyKeyboardRemove())
-    return NACHNAME
-
-async def nachname(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"]["nachname"] = update.message.text
-    await update.message.delete()
-    await update.message.reply_text("Geburtstag:", reply_markup=ReplyKeyboardRemove())
-    return GEBURTSTAG
-
-async def geburtstag(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"]["geburtstag"] = update.message.text
-    await update.message.delete()
-    await update.message.reply_text("Nationalität:", reply_markup=ReplyKeyboardRemove())
-    return NATIONALITÄT
-
-async def nationalität(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    flag = FLAGGEN.get(update.message.text.lower(), "🌍")
-    context.user_data["fahrer"]["nationalität"] = flag
-    await update.message.delete()
-    await update.message.reply_text("Sprache:", reply_markup=ReplyKeyboardRemove())
-    return SPRACHE
-
-async def sprache(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    sprache = SPRACHEN.get(update.message.text.lower(), "🗣️")
-    context.user_data["fahrer"]["sprache"] = sprache
-    await update.message.delete()
-    await update.message.reply_text("Mobilnummer:", reply_markup=ReplyKeyboardRemove())
-    return MOBIL
-
-async def mobil(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"]["mobil"] = update.message.text
-    await update.message.delete()
-    await update.message.reply_text("Angestellt seit:", reply_markup=ReplyKeyboardRemove())
-    return EINTRITT
-
-async def eintritt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"]["seit"] = update.message.text
-    await update.message.delete()
-    await update.message.reply_text("4-stelliger PIN:", reply_markup=ReplyKeyboardRemove())
-    return PIN
-
-async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["fahrer"]["pin"] = update.message.text
-    fahrerliste = context.application.bot_data.setdefault("fahrer", [])
-    neue_id = f"F{len(fahrerliste)+1:04}"
-    context.user_data["fahrer"]["id"] = neue_id
-    fahrerliste.append(context.user_data["fahrer"])
-    await update.message.delete()
-    await update.message.reply_text("✅ Fahrer gespeichert. Übersicht:")
-    text = "\n".join([f"{f['id']} – {f['vorname']} {f['nachname']} {f['sprache']} {f['nationalität']}" for f in fahrerliste])
-    await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
-    return ConversationHandler.END
-
+# === Bot starten ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    conv = ConversationHandler(
-        entry_points=[MessageHandler(filters.Regex("^(🆕 NEU|🆕\\sNEU)$"), neu_fahrer)],
-        states={
-            VORNAME: [MessageHandler(filters.TEXT, vorname)],
-            NACHNAME: [MessageHandler(filters.TEXT, nachname)],
-            GEBURTSTAG: [MessageHandler(filters.TEXT, geburtstag)],
-            NATIONALITÄT: [MessageHandler(filters.TEXT, nationalität)],
-            SPRACHE: [MessageHandler(filters.TEXT, sprache)],
-            MOBIL: [MessageHandler(filters.TEXT, mobil)],
-            EINTRITT: [MessageHandler(filters.TEXT, eintritt)],
-            PIN: [MessageHandler(filters.TEXT, pin)],
-        },
-        fallbacks=[]
-    )
-    app.add_handler(conv)
-
     app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
     app.run_polling()
