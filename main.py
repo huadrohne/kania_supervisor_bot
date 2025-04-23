@@ -7,7 +7,6 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler
 )
 
-# === Konstante Eingabefelder ===
 (VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
 FLAGGEN = {
@@ -17,7 +16,6 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
-# === Tastatur-Layouts ===
 main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True, one_time_keyboard=True)
 ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
@@ -28,13 +26,15 @@ fahrer_login_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
-# === Startbefehl ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
-    await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    context.chat_data[cid] = {
+        "state": "start",
+        "last_active": datetime.datetime.utcnow(),
+        "start_msg": msg.message_id
+    }
 
-# === Zurücksetzen bei Inaktivität ===
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
@@ -43,7 +43,6 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
             context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
-# === Eingaben verarbeiten ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     cid = update.effective_chat.id
@@ -51,6 +50,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
     chat_state["last_active"] = datetime.datetime.utcnow()
+
+    # Startnachricht ggf. löschen
+    start_msg = chat_state.get("start_msg")
+    if start_msg:
+        try:
+            await context.bot.delete_message(cid, start_msg)
+        except:
+            pass
+        chat_state["start_msg"] = None
 
     old_message = chat_state.get("status_msg")
     if old_message:
@@ -112,10 +120,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif chat_state.get("state") == "login_fahrer":
             m = await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
             chat_state["state"] = "start"
-            chat_state["status_msg"] = m.message_id
+            new_msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+            chat_state["start_msg"] = new_msg.message_id
         else:
-            await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
+            new_msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
             chat_state["state"] = "start"
+            chat_state["start_msg"] = new_msg.message_id
 
 # === Bot starten ===
 if __name__ == '__main__':
