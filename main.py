@@ -7,55 +7,30 @@ from telegram.ext import (
     filters, ContextTypes
 )
 
-# Menü-Layouts
-main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
-fahrer_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True)
-ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
-firma_markup = ReplyKeyboardMarkup([['👤 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True)
-
-RESET_MINUTES = 2
+main_menu = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
+    context.chat_data[cid] = {"state": "start", "msg_ids": []}
 
-    # Branding anzeigen
-    with open("branding.png", "rb") as img:
-        await context.bot.send_photo(chat_id=cid, photo=InputFile(img))
-    await update.message.reply_text("Lizensiert für Kania Schüttguttransporte")
+    # Branding-Bild
+    branding_msg = await context.bot.send_photo(chat_id=cid, photo=InputFile("branding.png"))
+    context.chat_data[cid]["msg_ids"].append(branding_msg.message_id)
 
+    # Lizenztext
+    lizenz_msg = await update.message.reply_text("Lizensiert für Kania Schüttguttransporte")
+    context.chat_data[cid]["msg_ids"].append(lizenz_msg.message_id)
+
+    # Nach 3 Sekunden löschen
     await asyncio.sleep(3)
-    await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
-    context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
+    for mid in context.chat_data[cid]["msg_ids"]:
+        try:
+            await context.bot.delete_message(chat_id=cid, message_id=mid)
+        except:
+            pass
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id
-    msg = update.message.text
-    context.chat_data[cid]["last_active"] = datetime.datetime.utcnow()
-
-    if msg == "⬅️ ZURÜCK":
-        state = context.chat_data[cid].get("state", "start")
-        if state == "fahrer" or state == "ceo":
-            await update.message.reply_text("Zurück zum Hauptmenü", reply_markup=main_markup)
-            context.chat_data[cid]["state"] = "start"
-        elif state == "firma":
-            await update.message.reply_text("Zurück zur CEO Plattform", reply_markup=ceo_markup)
-            context.chat_data[cid]["state"] = "ceo"
-
-    elif msg == "🚚 LOGIN FAHRER":
-        await update.message.reply_text("✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_markup)
-        context.chat_data[cid]["state"] = "fahrer"
-
-    elif msg == "👔 LOGIN CEO":
-        await update.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
-        context.chat_data[cid]["state"] = "ceo"
-
-    elif msg == "🏢 FIRMA":
-        await update.message.reply_text("🏢 Firmenbereich", reply_markup=firma_markup)
-        context.chat_data[cid]["state"] = "firma"
-
-    elif msg == "👤 FAHRER":
-        await update.message.reply_text("📋 Fahrerübersicht: Keine Fahrer vorhanden.", reply_markup=ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True))
-        context.chat_data[cid]["state"] = "fahrer_alle"
+    welcome = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
+    context.chat_data[cid]["msg_ids"] = [welcome.message_id]
 
 if __name__ == "__main__":
     import logging
@@ -65,6 +40,4 @@ if __name__ == "__main__":
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     app.run_polling()
