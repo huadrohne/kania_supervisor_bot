@@ -20,6 +20,7 @@ main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], res
 ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
 firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True)
 fahrer_markup = ReplyKeyboardMarkup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True)
+ersatz_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True)
 alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']], resize_keyboard=True)
 fahrer_login_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True)
 
@@ -53,7 +54,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
     chat_state["last_active"] = datetime.datetime.utcnow()
 
-    # alte Statusnachricht löschen
     old_message = chat_state.get("status_msg")
     if old_message:
         try:
@@ -62,7 +62,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         chat_state["status_msg"] = None
 
-    # "/start" Nachricht löschen (wenn vorhanden)
     if chat_state.get("start_msg"):
         try:
             await context.bot.delete_message(cid, chat_state["start_msg"])
@@ -100,6 +99,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["state"] = "fahrer"
         chat_state["status_msg"] = m.message_id
 
+    elif msg == "🔄 ERSATZ":
+        m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER/ ERSATZ", reply_markup=ersatz_markup)
+        chat_state["state"] = "ersatz"
+        chat_state["status_msg"] = m.message_id
+
     elif msg == "📋 ALLE":
         fahrerliste = context.application.bot_data.get("fahrer", [])
         if not fahrerliste:
@@ -112,6 +116,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif msg == "⬅️ ZURÜCK":
         if chat_state.get("state") == "alle":
+            m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER", reply_markup=fahrer_markup)
+            chat_state["state"] = "fahrer"
+            chat_state["status_msg"] = m.message_id
+        elif chat_state.get("state") == "ersatz":
             m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER", reply_markup=fahrer_markup)
             chat_state["state"] = "fahrer"
             chat_state["status_msg"] = m.message_id
