@@ -1,166 +1,188 @@
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+import datetime
+import os
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CallbackQueryHandler, CommandHandler,
-    ContextTypes, MessageHandler, filters
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    filters, ContextTypes, ConversationHandler
 )
 
-BOT_TOKEN = "DEIN_BOT_TOKEN"
+(VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
-user_states = {}
-fahrer_liste = []
-branding_message_ids = {}
+FLAGGEN = {
+    "deutschland": "🇩🇪", "polen": "🇵🇱", "türkei": "🇹🇷", "rumänien": "🇷🇴", "italien": "🇮🇹"
+}
+SPRACHEN = {
+    "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
+}
 
-# Start
+main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
+ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
+firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True)
+fahrer_markup = ReplyKeyboardMarkup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True)
+alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']], resize_keyboard=True)
+
+RESET_MINUTES = 2
+BRANDING_PATH = "branding.png"
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
+    context.chat_data[update.effective_chat.id] = {"state": "start", "last_active": datetime.datetime.utcnow()}
+    await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
 
-    # Branding + Lizenz
-    branding = await context.bot.send_photo(chat_id=chat_id, photo=open("branding.png", "rb"))
-    lizenz = await context.bot.send_message(chat_id=chat_id, text="Lizensiert für Kania Schüttguttransporte")
-    branding_message_ids[chat_id] = [branding.message_id, lizenz.message_id]
+async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.datetime.utcnow()
+    for chat_id, data in context.chat_data.items():
+        last_active = data.get("last_active")
+        if last_active and (now - last_active).total_seconds() > RESET_MINUTES * 60:
+            await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
+            context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
-    await asyncio.sleep(3)
-    for msg_id in branding_message_ids[chat_id]:
-        await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message.text
+    cid = update.effective_chat.id
     await update.message.delete()
 
-    # Willkommen
-    msg = await context.bot.send_message(
-        chat_id=chat_id,
-        text="Willkommen 👋\nBitte wähle deine Rolle:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚛 LOGIN FAHRER", callback_data="login_fahrer"),
-             InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
-        ])
-    )
-    user_states[chat_id] = {"ebene": "start", "msg_id": msg.message_id}
+    chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
+    chat_state["last_active"] = datetime.datetime.utcnow()
 
-
-# Zurück zur Startansicht
-async def reset_to_start(context: ContextTypes.DEFAULT_TYPE, chat_id):
-    if chat_id in user_states:
+    # vorherige Statusnachricht löschen
+    old_message = chat_state.get("status_msg")
+    if old_message:
         try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=user_states[chat_id].get("msg_id"))
+            await context.bot.delete_message(cid, old_message)
         except:
             pass
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text="Willkommen 👋\nBitte wähle deine Rolle:",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚛 LOGIN FAHRER", callback_data="login_fahrer"),
-             InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
-        ])
-    )
-    user_states[chat_id] = {"ebene": "start"}
+        chat_state["status_msg"] = None
 
+    if msg == "🚚 LOGIN FAHRER":
+        m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True))
+        img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        await asyncio.sleep(3)
+        await img.delete()
+        chat_state["state"] = "login_fahrer"
 
-# Button Handler
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat.id
+    elif msg == "👔 LOGIN CEO":
+        m = await context.bot.send_message(cid, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
+        img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        await asyncio.sleep(3)
+        await img.delete()
+        chat_state["state"] = "ceo"
 
-    if chat_id in user_states:
-        try:
-            await context.bot.delete_message(chat_id=chat_id, message_id=user_states[chat_id].get("msg_id"))
-        except:
-            pass
+    elif msg == "🏢 FIRMA":
+        m = await context.bot.send_message(cid, "Firmenbereich", reply_markup=firma_markup)
+        chat_state["state"] = "firma"
+        chat_state["status_msg"] = m.message_id
 
-    match query.data:
-        case "login_fahrer":
-            msg = await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform",
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_start")]]))
-            user_states[chat_id] = {"ebene": "login_fahrer", "msg_id": msg.message_id}
+    elif msg == "👷 FAHRER":
+        m = await context.bot.send_message(cid, "Fahrerbereich", reply_markup=fahrer_markup)
+        chat_state["state"] = "fahrer"
+        chat_state["status_msg"] = m.message_id
 
-        case "login_ceo":
-            msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform",
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏢 FIRMA", callback_data="firma"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_start")]]))
-            user_states[chat_id] = {"ebene": "login_ceo", "msg_id": msg.message_id}
+    elif msg == "📋 ALLE":
+        fahrerliste = context.application.bot_data.get("fahrer", [])
+        if not fahrerliste:
+            text = "Keine Fahrer vorhanden."
+        else:
+            text = "\n".join([f"{f['id']} – {f['vorname']} {f['nachname']} {f['sprache']} {f['nationalität']}" for f in fahrerliste])
+        m = await context.bot.send_message(cid, f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
+        chat_state["state"] = "alle"
+        chat_state["status_msg"] = m.message_id
 
-        case "firma":
-            msg = await query.message.reply_text("🏢 Firmenbereich",
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🧍‍♂️ FAHRER", callback_data="fahrer"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_ceo")]]))
-            user_states[chat_id] = {"ebene": "firma", "msg_id": msg.message_id}
+    elif msg == "⬅️ ZURÜCK":
+        if chat_state.get("state") == "alle":
+            m = await context.bot.send_message(cid, "⬅️ Zurück zum Fahrerbereich", reply_markup=fahrer_markup)
+            chat_state["state"] = "fahrer"
+            chat_state["status_msg"] = m.message_id
+        elif chat_state.get("state") == "fahrer":
+            m = await context.bot.send_message(cid, "⬅️ Zurück zum Firmenbereich", reply_markup=firma_markup)
+            chat_state["state"] = "firma"
+            chat_state["status_msg"] = m.message_id
+        else:
+            await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
+            chat_state["state"] = "start"
+            # === Fahrer anlegen ===
+async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.delete()
+    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
+    return VORNAME
 
-        case "fahrer":
-            if not fahrer_liste:
-                text = "📋 Fahrerübersicht: Keine Fahrer vorhanden."
-            else:
-                text = "📋 Fahrerübersicht:\n" + "\n".join(fahrer_liste)
+async def vorname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"] = {"vorname": update.message.text}
+    await update.message.delete()
+    await update.message.reply_text("Nachname:")
+    return NACHNAME
 
-            msg = await query.message.reply_text(text,
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📂 ALLE", callback_data="alle"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_firma")]]))
-            user_states[chat_id] = {"ebene": "fahrer", "msg_id": msg.message_id}
+async def nachname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["nachname"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Geburtstag:")
+    return GEBURTSTAG
 
-        case "alle":
-            msg = await query.message.reply_text("Fahreraktionen:",
-                                                 reply_markup=InlineKeyboardMarkup([
-                                                     [InlineKeyboardButton("🆕 NEU", callback_data="neu")],
-                                                     [InlineKeyboardButton("📝 ÄNDERN", callback_data="ändern")],
-                                                     [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_fahrer")]
-                                                 ]))
-            user_states[chat_id] = {"ebene": "alle", "msg_id": msg.message_id}
+async def geburtstag(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["geburtstag"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Nationalität:")
+    return NATIONALITÄT
 
-        case "neu":
-            await query.message.reply_text("Bitte gib den **Vornamen** des Fahrers ein:")
-            user_states[chat_id] = {"ebene": "fahrer_neu", "daten": {}}
+async def nationalität(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    flag = FLAGGEN.get(update.message.text.lower(), "🌍")
+    context.user_data["fahrer"]["nationalität"] = flag
+    await update.message.delete()
+    await update.message.reply_text("Sprache:")
+    return SPRACHE
 
-        case "zurueck_start":
-            await reset_to_start(context, chat_id)
+async def sprache(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sprache = SPRACHEN.get(update.message.text.lower(), "🗣️")
+    context.user_data["fahrer"]["sprache"] = sprache
+    await update.message.delete()
+    await update.message.reply_text("Mobilnummer:")
+    return MOBIL
 
-        case "zurueck_ceo":
-            msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform",
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏢 FIRMA", callback_data="firma"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_start")]]))
-            user_states[chat_id] = {"ebene": "login_ceo", "msg_id": msg.message_id}
+async def mobil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["mobil"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Angestellt seit:")
+    return EINTRITT
 
-        case "zurueck_firma":
-            msg = await query.message.reply_text("🏢 Firmenbereich",
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🧍‍♂️ FAHRER", callback_data="fahrer"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_ceo")]]))
-            user_states[chat_id] = {"ebene": "firma", "msg_id": msg.message_id}
+async def eintritt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["seit"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("4-stelliger PIN:")
+    return PIN
 
-        case "zurueck_fahrer":
-            if not fahrer_liste:
-                text = "📋 Fahrerübersicht: Keine Fahrer vorhanden."
-            else:
-                text = "📋 Fahrerübersicht:\n" + "\n".join(fahrer_liste)
-            msg = await query.message.reply_text(text,
-                                                 reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📂 ALLE", callback_data="alle"),
-                                                                                     InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_firma")]]))
-            user_states[chat_id] = {"ebene": "fahrer", "msg_id": msg.message_id}
+async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["pin"] = update.message.text
+    fahrerliste = context.application.bot_data.setdefault("fahrer", [])
+    neue_id = f"F{len(fahrerliste)+1:04}"
+    context.user_data["fahrer"]["id"] = neue_id
+    fahrerliste.append(context.user_data["fahrer"])
+    await update.message.delete()
+    await update.message.reply_text("✅ Fahrer gespeichert. Übersicht:")
+    text = "\n".join([f"{f['id']} – {f['vorname']} {f['nachname']} {f['sprache']} {f['nationalität']}" for f in fahrerliste])
+    await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
+    return ConversationHandler.END
 
-
-# Eingaben erfassen (Fahrer anlegen)
-async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    text = update.message.text
-
-    if user_states.get(chat_id, {}).get("ebene") == "fahrer_neu":
-        user_states[chat_id]["daten"]["vorname"] = text
-        user_states[chat_id]["ebene"] = "fahrer_name"
-        await update.message.reply_text("Bitte gib den **Nachnamen** ein:")
-    elif user_states.get(chat_id, {}).get("ebene") == "fahrer_name":
-        user_states[chat_id]["daten"]["nachname"] = text
-        daten = user_states[chat_id]["daten"]
-        daten["id"] = f"Fahrer_{len(fahrer_liste)+1:03}"
-        fahrer_liste.append(f"{daten['id']}: {daten['vorname']} {daten['nachname']}")
-        await update.message.reply_text("✅ Fahrer wurde hinzugefügt!")
-        msg = await update.message.reply_text("📋 Fahrerübersicht:\n" + "\n".join(fahrer_liste),
-                                              reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📂 ALLE", callback_data="alle"),
-                                                                                  InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_firma")]]))
-        user_states[chat_id] = {"ebene": "fahrer", "msg_id": msg.message_id}
-
-
-# Bot starten
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+# === Bot starten ===
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(buttons))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    conv = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^(🆕 NEU|🆕\\sNEU)$"), neu_fahrer)],
+        states={
+            VORNAME: [MessageHandler(filters.TEXT, vorname)],
+            NACHNAME: [MessageHandler(filters.TEXT, nachname)],
+            GEBURTSTAG: [MessageHandler(filters.TEXT, geburtstag)],
+            NATIONALITÄT: [MessageHandler(filters.TEXT, nationalität)],
+            SPRACHE: [MessageHandler(filters.TEXT, sprache)],
+            MOBIL: [MessageHandler(filters.TEXT, mobil)],
+            EINTRITT: [MessageHandler(filters.TEXT, eintritt)],
+            PIN: [MessageHandler(filters.TEXT, pin)],
+        },
+        fallbacks=[]
+    )
+    app.add_handler(conv)
+
+    app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
     app.run_polling()
