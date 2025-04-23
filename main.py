@@ -28,8 +28,14 @@ BRANDING_PATH = "branding.png"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
-    context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow(), "start_msg": msg.message_id}
+    if update.message:
+        await update.message.delete()
+    msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    context.chat_data[cid] = {
+        "state": "start",
+        "last_active": datetime.datetime.utcnow(),
+        "start_msg": msg.message_id
+    }
 
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
@@ -47,6 +53,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
     chat_state["last_active"] = datetime.datetime.utcnow()
 
+    # alte Statusnachricht löschen
     old_message = chat_state.get("status_msg")
     if old_message:
         try:
@@ -55,6 +62,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         chat_state["status_msg"] = None
 
+    # "/start" Nachricht löschen (wenn vorhanden)
     if chat_state.get("start_msg"):
         try:
             await context.bot.delete_message(cid, chat_state["start_msg"])
