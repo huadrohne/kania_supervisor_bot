@@ -1,7 +1,7 @@
 import asyncio
 import datetime
 import os
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
@@ -16,11 +16,11 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
-main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
-ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
-firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True)
-fahrer_markup = ReplyKeyboardMarkup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True)
-alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']], resize_keyboard=True)
+main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True, one_time_keyboard=True)
+ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
+firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
+fahrer_markup = ReplyKeyboardMarkup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
+alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
@@ -45,7 +45,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
     chat_state["last_active"] = datetime.datetime.utcnow()
 
-    # vorherige Statusnachricht löschen
     old_message = chat_state.get("status_msg")
     if old_message:
         try:
@@ -55,7 +54,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["status_msg"] = None
 
     if msg == "🚚 LOGIN FAHRER":
-        m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True))
+        m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_markup)
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await img.delete()
@@ -100,54 +99,55 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
             chat_state["state"] = "start"
-            # === Fahrer anlegen ===
+
+# Fahrer anlegen
 async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
-    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
+    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:", reply_markup=ReplyKeyboardRemove())
     return VORNAME
 
 async def vorname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"] = {"vorname": update.message.text}
     await update.message.delete()
-    await update.message.reply_text("Nachname:")
+    await update.message.reply_text("Nachname:", reply_markup=ReplyKeyboardRemove())
     return NACHNAME
 
 async def nachname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"]["nachname"] = update.message.text
     await update.message.delete()
-    await update.message.reply_text("Geburtstag:")
+    await update.message.reply_text("Geburtstag:", reply_markup=ReplyKeyboardRemove())
     return GEBURTSTAG
 
 async def geburtstag(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"]["geburtstag"] = update.message.text
     await update.message.delete()
-    await update.message.reply_text("Nationalität:")
+    await update.message.reply_text("Nationalität:", reply_markup=ReplyKeyboardRemove())
     return NATIONALITÄT
 
 async def nationalität(update: Update, context: ContextTypes.DEFAULT_TYPE):
     flag = FLAGGEN.get(update.message.text.lower(), "🌍")
     context.user_data["fahrer"]["nationalität"] = flag
     await update.message.delete()
-    await update.message.reply_text("Sprache:")
+    await update.message.reply_text("Sprache:", reply_markup=ReplyKeyboardRemove())
     return SPRACHE
 
 async def sprache(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sprache = SPRACHEN.get(update.message.text.lower(), "🗣️")
     context.user_data["fahrer"]["sprache"] = sprache
     await update.message.delete()
-    await update.message.reply_text("Mobilnummer:")
+    await update.message.reply_text("Mobilnummer:", reply_markup=ReplyKeyboardRemove())
     return MOBIL
 
 async def mobil(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"]["mobil"] = update.message.text
     await update.message.delete()
-    await update.message.reply_text("Angestellt seit:")
+    await update.message.reply_text("Angestellt seit:", reply_markup=ReplyKeyboardRemove())
     return EINTRITT
 
 async def eintritt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"]["seit"] = update.message.text
     await update.message.delete()
-    await update.message.reply_text("4-stelliger PIN:")
+    await update.message.reply_text("4-stelliger PIN:", reply_markup=ReplyKeyboardRemove())
     return PIN
 
 async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,7 +162,6 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
     return ConversationHandler.END
 
-# === Bot starten ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
