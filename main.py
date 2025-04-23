@@ -27,8 +27,7 @@ BRANDING_PATH = "branding.png"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
-    msg = await update.message.reply_text("Willkommen 👋
-Bitte wähle deine Rolle:", reply_markup=main_markup)
+    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
     context.chat_data[cid] = {
         "state": "start",
         "last_active": datetime.datetime.utcnow(),
