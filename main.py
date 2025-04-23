@@ -27,8 +27,19 @@ RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.chat_data[update.effective_chat.id] = {"state": "start", "last_active": datetime.datetime.utcnow()}
-    await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    cid = update.effective_chat.id
+    context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
+
+    branding = await context.bot.send_photo(chat_id=cid, photo=open(BRANDING_PATH, "rb"))
+    lizenz = await context.bot.send_message(chat_id=cid, text="Lizensiert für Kania Schüttguttransporte")
+    await asyncio.sleep(2)
+    try:
+        await branding.delete()
+        await lizenz.delete()
+    except:
+        pass
+
+    await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
 
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
@@ -57,7 +68,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg == "🚚 LOGIN FAHRER":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_login_markup)
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         await img.delete()
         chat_state["state"] = "login_fahrer"
         chat_state["status_msg"] = m.message_id
@@ -65,7 +76,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg == "👔 LOGIN CEO":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
         await img.delete()
         chat_state["state"] = "ceo"
         chat_state["status_msg"] = m.message_id
