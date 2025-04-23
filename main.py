@@ -8,6 +8,9 @@ from telegram.ext import (
 )
 
 main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
+fahrer_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True)
+ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
+
 RESET_MINUTES = 2
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -26,6 +29,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg == "⬅️ ZURÜCK":
         await update.message.reply_text("Zurück zum Hauptmenü", reply_markup=main_markup)
         context.chat_data[cid]["state"] = "start"
+
+    elif msg == "🚚 LOGIN FAHRER":
+        await update.message.reply_text("✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_markup)
+        context.chat_data[cid]["state"] = "fahrer"
+
+    elif msg == "👔 LOGIN CEO":
+        await update.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
+        context.chat_data[cid]["state"] = "ceo"
 
 if __name__ == "__main__":
     import logging
