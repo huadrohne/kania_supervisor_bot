@@ -1,43 +1,56 @@
-import os
-import datetime
 import asyncio
-from telegram import Update, ReplyKeyboardMarkup, InputFile
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    filters, ContextTypes
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
+import os
 
-main_menu = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
+# Variablen für Branding und Lizenz
+BRANDING_IMAGE = "branding.png"
+LICENSE_TEXT = "Lizensiert für Kania Schüttguttransporte"
 
+# Start-Handler
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.effective_chat.id
-    context.chat_data[cid] = {"state": "start", "msg_ids": []}
+    # Branding anzeigen
+    with open(BRANDING_IMAGE, 'rb') as photo:
+        branding_msg = await update.message.reply_photo(photo=photo)
 
-    # Branding-Bild
-    branding_msg = await context.bot.send_photo(chat_id=cid, photo=InputFile("branding.png"))
-    context.chat_data[cid]["msg_ids"].append(branding_msg.message_id)
+    # Lizenztext anzeigen
+    license_msg = await update.message.reply_text(LICENSE_TEXT)
 
-    # Lizenztext
-    lizenz_msg = await update.message.reply_text("Lizensiert für Kania Schüttguttransporte")
-    context.chat_data[cid]["msg_ids"].append(lizenz_msg.message_id)
-
-    # Nach 3 Sekunden löschen
+    # Branding & Lizenz nach 3 Sekunden löschen
     await asyncio.sleep(3)
-    for mid in context.chat_data[cid]["msg_ids"]:
-        try:
-            await context.bot.delete_message(chat_id=cid, message_id=mid)
-        except:
-            pass
+    await branding_msg.delete()
+    await license_msg.delete()
 
-    welcome = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
-    context.chat_data[cid]["msg_ids"] = [welcome.message_id]
+    # Hauptmenü anzeigen
+    welcome_msg = await update.message.reply_text(
+        "Willkommen 👋\nBitte wähle deine Rolle:",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚛 LOGIN FAHRER", callback_data="login_fahrer")],
+            [InlineKeyboardButton("🧑‍💼 LOGIN CEO", callback_data="login_ceo")]
+        ])
+    )
+    # Message ID speichern für möglichen Reset
+    context.user_data['welcome_msg_id'] = welcome_msg.message_id
 
-if __name__ == "__main__":
-    import logging
-    logging.basicConfig(level=logging.INFO)
+# Callback-Handler für die Buttons
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
 
+    if query.data == "login_fahrer":
+        await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform")
+
+    elif query.data == "login_ceo":
+        await query.message.reply_text("✅ Willkommen auf der CEO Plattform")
+
+# Bot starten
+if __name__ == '__main__':
     TOKEN = os.getenv("BOT_TOKEN")
+
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_buttons))
+
+    print("Bot läuft...")
     app.run_polling()
