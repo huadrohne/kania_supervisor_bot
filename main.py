@@ -1,14 +1,16 @@
 import asyncio
 import datetime
 import os
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
 )
 
+# Zustände für Fahrer-Eingabe
 (VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
+# Flaggen + Sprachen
 FLAGGEN = {
     "deutschland": "🇩🇪", "polen": "🇵🇱", "türkei": "🇹🇷", "rumänien": "🇷🇴", "italien": "🇮🇹"
 }
@@ -16,6 +18,7 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
+# Menüs
 main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True)
 ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True)
 firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True)
@@ -25,10 +28,17 @@ alle_markup = ReplyKeyboardMarkup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜC
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
+# Startnachricht
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.chat_data[update.effective_chat.id] = {"state": "start", "last_active": datetime.datetime.utcnow()}
-    await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    cid = update.effective_chat.id
+    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+    context.chat_data[cid] = {
+        "state": "start",
+        "last_active": datetime.datetime.utcnow(),
+        "welcome_msg": msg.message_id
+    }
 
+# Auto-Reset
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
@@ -37,47 +47,58 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
             context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
+# Hauptmenü
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     cid = update.effective_chat.id
     await update.message.delete()
 
-    chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
+    chat_state = context.chat_data.setdefault(cid, {
+        "state": "start",
+        "last_active": datetime.datetime.utcnow()
+    })
     chat_state["last_active"] = datetime.datetime.utcnow()
 
-    # vorherige Statusnachricht löschen
-    old_message = chat_state.get("status_msg")
-    if old_message:
-        try:
-            await context.bot.delete_message(cid, old_message)
-        except:
-            pass
-        chat_state["status_msg"] = None
+    # Lösche alte Status- oder Willkommensnachricht
+    for key in ["status_msg", "welcome_msg", "login_msg"]:
+        if mid := chat_state.get(key):
+            try:
+                await context.bot.delete_message(cid, mid)
+            except:
+                pass
+            chat_state[key] = None
 
+    # Login Fahrer
     if msg == "🚚 LOGIN FAHRER":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=True))
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await img.delete()
         chat_state["state"] = "login_fahrer"
+        chat_state["login_msg"] = m.message_id
 
+    # Login CEO
     elif msg == "👔 LOGIN CEO":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
         img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
         await asyncio.sleep(3)
         await img.delete()
         chat_state["state"] = "ceo"
+        chat_state["login_msg"] = m.message_id
 
+    # Firma
     elif msg == "🏢 FIRMA":
         m = await context.bot.send_message(cid, "Firmenbereich", reply_markup=firma_markup)
         chat_state["state"] = "firma"
         chat_state["status_msg"] = m.message_id
 
+    # Fahrer
     elif msg == "👷 FAHRER":
         m = await context.bot.send_message(cid, "Fahrerbereich", reply_markup=fahrer_markup)
         chat_state["state"] = "fahrer"
         chat_state["status_msg"] = m.message_id
 
+    # ALLE
     elif msg == "📋 ALLE":
         fahrerliste = context.application.bot_data.get("fahrer", [])
         if not fahrerliste:
@@ -88,6 +109,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["state"] = "alle"
         chat_state["status_msg"] = m.message_id
 
+    # Zurück
     elif msg == "⬅️ ZURÜCK":
         if chat_state.get("state") == "alle":
             m = await context.bot.send_message(cid, "⬅️ Zurück zum Fahrerbereich", reply_markup=fahrer_markup)
@@ -97,13 +119,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             m = await context.bot.send_message(cid, "⬅️ Zurück zum Firmenbereich", reply_markup=firma_markup)
             chat_state["state"] = "firma"
             chat_state["status_msg"] = m.message_id
-        else:
-            await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
+        elif chat_state.get("state") in ["ceo", "login_fahrer"]:
+            m = await context.bot.send_message(cid, "⬅️ Zurück zum Hauptmenü", reply_markup=main_markup)
             chat_state["state"] = "start"
+            chat_state["welcome_msg"] = m.message_id
             # === Fahrer anlegen ===
 async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
-    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
+    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:", reply_markup=ReplyKeyboardRemove())
     return VORNAME
 
 async def vorname(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,7 +185,7 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
     return ConversationHandler.END
 
-# === Bot starten ===
+# === Setup & Start ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
