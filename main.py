@@ -7,6 +7,7 @@ from telegram.ext import (
     filters, ContextTypes, ConversationHandler
 )
 
+# === Konstante Eingabefelder ===
 (VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
 FLAGGEN = {
@@ -16,6 +17,7 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
+# === Tastatur-Layouts ===
 main_markup = ReplyKeyboardMarkup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']], resize_keyboard=True, one_time_keyboard=True)
 ceo_markup = ReplyKeyboardMarkup([['🏢 FIRMA', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
 firma_markup = ReplyKeyboardMarkup([['👷 FAHRER', '⬅️ ZURÜCK']], resize_keyboard=True, one_time_keyboard=True)
@@ -26,21 +28,13 @@ fahrer_login_markup = ReplyKeyboardMarkup([['⬅️ ZURÜCK']], resize_keyboard=
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
+# === Startbefehl ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
-
-    branding = await context.bot.send_photo(chat_id=cid, photo=open(BRANDING_PATH, "rb"))
-    lizenz = await context.bot.send_message(chat_id=cid, text="Lizensiert für Kania Schüttguttransporte")
-    await asyncio.sleep(2)
-    try:
-        await branding.delete()
-        await lizenz.delete()
-    except:
-        pass
-
     await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
 
+# === Zurücksetzen bei Inaktivität ===
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
@@ -49,6 +43,7 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
             context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
+# === Eingaben verarbeiten ===
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     cid = update.effective_chat.id
@@ -67,17 +62,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if msg == "🚚 LOGIN FAHRER":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der Fahrer Plattform", reply_markup=fahrer_login_markup)
-        img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        branding = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        lizenz = await context.bot.send_message(cid, "Lizensiert für Kania Schüttguttransporte")
         await asyncio.sleep(2)
-        await img.delete()
+        await branding.delete()
+        await lizenz.delete()
         chat_state["state"] = "login_fahrer"
         chat_state["status_msg"] = m.message_id
 
     elif msg == "👔 LOGIN CEO":
         m = await context.bot.send_message(cid, "✅ Willkommen auf der CEO Plattform", reply_markup=ceo_markup)
-        img = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        branding = await context.bot.send_photo(cid, photo=open(BRANDING_PATH, "rb"))
+        lizenz = await context.bot.send_message(cid, "Lizensiert für Kania Schüttguttransporte")
         await asyncio.sleep(2)
-        await img.delete()
+        await branding.delete()
+        await lizenz.delete()
         chat_state["state"] = "ceo"
         chat_state["status_msg"] = m.message_id
 
