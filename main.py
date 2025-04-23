@@ -83,12 +83,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["status_msg"] = m.message_id
 
     elif msg == "🏢 FIRMA":
-        m = await context.bot.send_message(cid, "Firmenbereich", reply_markup=firma_markup)
+        m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA", reply_markup=firma_markup)
         chat_state["state"] = "firma"
         chat_state["status_msg"] = m.message_id
 
     elif msg == "👷 FAHRER":
-        m = await context.bot.send_message(cid, "Fahrerbereich", reply_markup=fahrer_markup)
+        m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER", reply_markup=fahrer_markup)
         chat_state["state"] = "fahrer"
         chat_state["status_msg"] = m.message_id
 
@@ -182,7 +182,7 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
     return ConversationHandler.END
 
-# === Start ===
+# === Bot starten ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
