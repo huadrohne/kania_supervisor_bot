@@ -2,10 +2,10 @@ import os
 import datetime
 import asyncio
 from telegram import (
-    InlineKeyboardButton, InlineKeyboardMarkup, Update, InputMediaPhoto
+    InlineKeyboardButton, InlineKeyboardMarkup, Update
 )
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 )
 
 # === Menüs ===
@@ -99,28 +99,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         branding_needed = True
 
     elif query.data == "firma":
-        pfad = "📂 LOGIN CEO/ FIRMA"
+        pfad = "📂 LOGIN CEO ➜ FIRMA"
         reply_markup = firma_menu()
 
     elif query.data == "fahrer":
-        pfad = "📂 LOGIN CEO/ FIRMA/ FAHRER"
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER"
         reply_markup = fahrer_unter_menu()
 
     elif query.data == "alle":
-        pfad = "📂 LOGIN CEO/ FIRMA/ FAHRER"
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER"
         await context.bot.send_message(chat_id, "📋 Fahrerübersicht:\nKeine Fahrer vorhanden.", reply_markup=fahrer_unter_menu())
         return
 
     elif query.data == "ersatz":
-        pfad = "📂 LOGIN CEO/ FIRMA/ FAHRER/ ERSATZ"
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER ➜ ERSATZ"
         reply_markup = ersatz_menu()
 
     elif query.data == "back_to_fahrer":
-        pfad = "📂 LOGIN CEO/ FIRMA/ FAHRER"
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER"
         reply_markup = fahrer_unter_menu()
 
     elif query.data == "back_to_firma":
-        pfad = "📂 LOGIN CEO/ FIRMA"
+        pfad = "📂 LOGIN CEO ➜ FIRMA"
         reply_markup = firma_menu()
 
     elif query.data == "back_to_ceo":
