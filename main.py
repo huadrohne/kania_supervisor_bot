@@ -7,110 +7,124 @@ from telegram.ext import (
     ContextTypes, ConversationHandler, MessageHandler, filters
 )
 
-RESET_MINUTES = 2
-BRANDING_PATH = "branding.png"
+# === Konstanten für das Fahrerformular ===
+(VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
-def inline_keyboard(buttons):
-    return InlineKeyboardMarkup([[InlineKeyboardButton(text, callback_data=data)] for text, data in buttons])
+# === Markups ===
+def main_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚛 LOGIN FAHRER", callback_data="login_fahrer")],
+        [InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
+    ])
 
-main_menu = inline_keyboard([("🚛 LOGIN FAHRER", "login_fahrer"), ("👔 LOGIN CEO", "login_ceo")])
-zurück_button = inline_keyboard([("⬅️ ZURÜCK", "zurück")])
-firma_menu = inline_keyboard([("🏢 FIRMA", "firma"), ("⬅️ ZURÜCK", "zurück")])
-fahrer_menu = inline_keyboard([("👷 FAHRER", "fahrer"), ("⬅️ ZURÜCK", "zurück")])
-alle_menu = inline_keyboard([("📋 ALLE", "alle"), ("🔄 ERSATZ", "ersatz"), ("⬅️ ZURÜCK", "zurück")])
-ersatz_menu = inline_keyboard([("⬅️ ZURÜCK", "zurück")])
+def ceo_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏢 FIRMA", callback_data="firma")],
+        [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_start")]
+    ])
 
+def firma_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🧑‍✈️ FAHRER", callback_data="fahrer")],
+        [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_ceo")]
+    ])
+
+def fahrer_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📋 ALLE", callback_data="alle")],
+        [InlineKeyboardButton("🔄 ERSATZ", callback_data="ersatz")],
+        [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_firma")]
+    ])
+
+def ersatz_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_fahrer")]
+    ])
+
+# === Start & Branding ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.chat_data[update.effective_chat.id] = {"state": "start", "last_active": datetime.datetime.utcnow()}
     await update.message.delete()
-    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
-    context.chat_data[update.effective_chat.id]["menu_msg"] = msg.message_id
+    context.user_data.clear()
+    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu())
+    context.user_data["last_menu_msg"] = msg.message_id
 
-async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
-    now = datetime.datetime.utcnow()
-    for chat_id, data in context.chat_data.items():
-        last_active = data.get("last_active")
-        if last_active and (now - last_active).total_seconds() > RESET_MINUTES * 60:
-            await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_menu)
-            context.chat_data[chat_id] = {"state": "start", "last_active": now}
-
-async def send_branding(context, chat_id):
-    branding = await context.bot.send_photo(chat_id, photo=open(BRANDING_PATH, "rb"))
-    text = await context.bot.send_message(chat_id, "Lizensiert für Kania Schüttguttransporte")
-    await asyncio.sleep(2)
-    await branding.delete()
-    await text.delete()
-
-async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# === Button-Handling ===
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    cid = query.message.chat_id
     await query.answer()
-    state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
-    state["last_active"] = datetime.datetime.utcnow()
+    cid = query.message.chat.id
 
-    # alte Statusnachricht löschen
-    if "status_msg" in state:
-        try:
-            await context.bot.delete_message(cid, state["status_msg"])
-        except:
-            pass
+    # Alte Nachricht löschen
+    try:
+        await context.bot.delete_message(chat_id=cid, message_id=context.user_data.get("last_menu_msg", 0))
+    except:
+        pass
 
-    # Menü-Nachricht löschen
-    if "menu_msg" in state:
-        try:
-            await context.bot.delete_message(cid, state["menu_msg"])
-        except:
-            pass
+    pfad = ""
+    reply_markup = None
+    branding_needed = False
 
-    cmd = query.data
+    if query.data == "login_fahrer":
+        pfad = "📂 LOGIN FAHRER"
+        reply_markup = InlineKeyboardMarkup([[InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_start")]])
+        branding_needed = True
 
-    if cmd == "login_fahrer":
-        await send_branding(context, cid)
-        msg = await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform", reply_markup=zurück_button)
-        state.update({"state": "login_fahrer", "status_msg": msg.message_id})
+    elif query.data == "login_ceo":
+        pfad = "📂 LOGIN CEO"
+        reply_markup = ceo_menu
+        branding_needed = True
 
-    elif cmd == "login_ceo":
-        await send_branding(context, cid)
-        msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=firma_menu)
-        state.update({"state": "ceo", "status_msg": msg.message_id})
+    elif query.data == "firma":
+        pfad = "📂 LOGIN CEO ➜ FIRMA"
+        reply_markup = firma_menu()
 
-    elif cmd == "firma":
-        msg = await query.message.reply_text("LOGIN CEO/ FIRMA", reply_markup=fahrer_menu)
-        state.update({"state": "firma", "status_msg": msg.message_id})
+    elif query.data == "fahrer":
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER"
+        reply_markup = fahrer_menu()
 
-    elif cmd == "fahrer":
-        msg = await query.message.reply_text("LOGIN CEO/ FIRMA/ FAHRER", reply_markup=alle_menu)
-        state.update({"state": "fahrer", "status_msg": msg.message_id})
+    elif query.data == "alle":
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER ➜ ALLE"
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_fahrer")]
+        ])
 
-    elif cmd == "alle":
-        msg = await query.message.reply_text("📋 Fahrerübersicht: Keine Fahrer vorhanden.", reply_markup=alle_menu)
-        state.update({"state": "alle", "status_msg": msg.message_id})
+    elif query.data == "ersatz":
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER ➜ ERSATZ"
+        reply_markup = ersatz_menu()
 
-    elif cmd == "ersatz":
-        msg = await query.message.reply_text("🔄 Ersatzfahrer-Verwaltung", reply_markup=ersatz_menu)
-        state.update({"state": "ersatz", "status_msg": msg.message_id})
+    elif query.data == "zurueck_start":
+        pfad = "Willkommen 👋\nBitte wähle deine Rolle:"
+        reply_markup = main_menu()
 
-    elif cmd == "zurück":
-        prev = state.get("state")
-        if prev == "alle" or prev == "ersatz":
-            msg = await query.message.reply_text("LOGIN CEO/ FIRMA/ FAHRER", reply_markup=alle_menu)
-            state.update({"state": "fahrer", "status_msg": msg.message_id})
-        elif prev == "fahrer":
-            msg = await query.message.reply_text("LOGIN CEO/ FIRMA", reply_markup=fahrer_menu)
-            state.update({"state": "firma", "status_msg": msg.message_id})
-        elif prev == "firma":
-            msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=firma_menu)
-            state.update({"state": "ceo", "status_msg": msg.message_id})
-        elif prev == "login_fahrer" or prev == "ceo":
-            msg = await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
-            state.update({"state": "start", "menu_msg": msg.message_id})
-        else:
-            msg = await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
-            state.update({"state": "start", "menu_msg": msg.message_id})
+    elif query.data == "zurueck_ceo":
+        pfad = "📂 LOGIN CEO"
+        reply_markup = ceo_menu()
 
+    elif query.data == "zurueck_firma":
+        pfad = "📂 LOGIN CEO ➜ FIRMA"
+        reply_markup = firma_menu()
+
+    elif query.data == "zurueck_fahrer":
+        pfad = "📂 LOGIN CEO ➜ FIRMA ➜ FAHRER"
+        reply_markup = fahrer_menu()
+
+    else:
+        pfad = "❓ Unbekannter Button"
+        reply_markup = main_menu()
+
+    if branding_needed:
+        branding_img = await context.bot.send_photo(cid, photo=open("branding.png", "rb"))
+        branding_txt = await context.bot.send_message(cid, "Lizensiert für Kania Schüttguttransporte")
+        await asyncio.sleep(2)
+        await branding_img.delete()
+        await branding_txt.delete()
+
+    msg = await context.bot.send_message(cid, pfad, reply_markup=reply_markup)
+    context.user_data["last_menu_msg"] = msg.message_id
+
+# === Hauptprogramm ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(handle_buttons))
-    app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.run_polling()
