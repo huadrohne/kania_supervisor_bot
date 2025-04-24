@@ -1,9 +1,7 @@
 import asyncio
 import datetime
 import os
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler,
     ContextTypes, ConversationHandler, MessageHandler, filters
@@ -18,14 +16,13 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
-RESET_MINUTES = 2
-BRANDING_PATH = "branding.png"
+RESET_MINUTEN = 2
+BRANDING_PFAD = "branding.png"
 
-# === Menübereiche (Inline)
 def get_main_menu():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚚 LOGIN FAHRER", callback_data="login_fahrer")],
-        [InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
+        [InlineKeyboardButton("🚚 LOGIN FAHRER", callback_data="login_fahrer"),
+         InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
     ])
 
 def get_ceo_menu():
@@ -57,7 +54,6 @@ def get_alle_menu():
         [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="zurueck_fahrer")]
     ])
 
-# === Start & Navigation
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
@@ -69,7 +65,8 @@ async def clear_messages(cid, context):
     if "active_msg" in context.chat_data[cid]:
         try:
             await context.bot.delete_message(cid, context.chat_data[cid]["active_msg"])
-        except: pass
+        except:
+            pass
         context.chat_data[cid]["active_msg"] = None
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -111,7 +108,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             elif data == "fahrer":
         m = await query.message.reply_text("📂 LOGIN CEO ➜ FIRMA ➜ FAHRER", reply_markup=get_alle_menu())
         context.chat_data[cid]["active_msg"] = m.message_id
-        context.chat_data[cid]["state"] = "alle"
+        context.chat_data[cid]["state"] = "fahrer"
 
     elif data == "fahrer_kalender":
         m = await query.message.reply_text("📂 LOGIN FAHRER ➜ KALENDER", reply_markup=InlineKeyboardMarkup([
@@ -135,9 +132,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         m = await query.message.reply_text("📂 LOGIN CEO ➜ FIRMA ➜ FAHRER", reply_markup=get_fahrer_menu())
         context.chat_data[cid]["active_msg"] = m.message_id
 
+    elif data == "zurueck_ceo":
+        m = await query.message.reply_text("📂 LOGIN CEO", reply_markup=get_ceo_menu())
+        context.chat_data[cid]["active_msg"] = m.message_id
+
     elif data == "zurueck_start":
         m = await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=get_main_menu())
         context.chat_data[cid]["active_msg"] = m.message_id
+        context.chat_data[cid]["state"] = "start"
 
     elif data == "neu":
         await query.message.delete()
@@ -199,12 +201,12 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Fahrer gespeichert.")
     return ConversationHandler.END
 
-# === Reset bei Inaktivität
+# === Auto-Reset bei Inaktivität
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
         last = data.get("last_active")
-        if last and (now - last).total_seconds() > RESET_MINUTES * 60:
+        if last and (now - last).total_seconds() > RESET_MINUTEN * 60:
             try:
                 await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=get_main_menu())
                 context.chat_data[chat_id] = {"state": "start", "last_active": now}
@@ -231,6 +233,7 @@ if __name__ == '__main__':
         },
         fallbacks=[]
     )
+
     app.add_handler(conv)
     app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
     app.run_polling()
