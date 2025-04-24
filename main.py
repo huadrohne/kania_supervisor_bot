@@ -1,13 +1,12 @@
 import asyncio
 import datetime
 import os
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
 )
 
-# Konstanten
 (VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
 FLAGGEN = {
@@ -17,30 +16,20 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
-def markup(buttons):
-    return ReplyKeyboardMarkup(
-        buttons,
-        resize_keyboard=True,
-        one_time_keyboard=False,
-        is_persistent=True,
-        selective=True,
-        input_field_placeholder="",
-        placeholder=""
-    )
+def custom_markup(buttons):
+    return ReplyKeyboardMarkup(buttons, resize_keyboard=True, one_time_keyboard=True)
 
-# Menüs
-main_markup = markup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']])
-ceo_markup = markup([['🏢 FIRMA', '⬅️ ZURÜCK']])
-firma_markup = markup([['👷 FAHRER', '⬅️ ZURÜCK']])
-fahrer_markup = markup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']])
-ersatz_markup = markup([['⬅️ ZURÜCK']])
-alle_markup = markup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']])
-fahrer_login_markup = markup([['⬅️ ZURÜCK']])
+main_markup = custom_markup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']])
+ceo_markup = custom_markup([['🏢 FIRMA', '⬅️ ZURÜCK']])
+firma_markup = custom_markup([['👷 FAHRER', '⬅️ ZURÜCK']])
+fahrer_markup = custom_markup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']])
+ersatz_markup = custom_markup([['⬅️ ZURÜCK']])
+alle_markup = custom_markup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']])
+fahrer_login_markup = custom_markup([['⬅️ ZURÜCK']])
 
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
-# Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.message:
@@ -52,7 +41,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "start_msg": msg.message_id
     }
 
-# Reset bei Inaktivität
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
@@ -61,7 +49,6 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
             context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
-# Button Handling
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     cid = update.effective_chat.id
@@ -147,7 +134,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_state["state"] = "start"
             chat_state["start_msg"] = msg.message_id
 
-# === Fahreranlage ===
+# Fahrer hinzufügen
 async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
     await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
@@ -209,7 +196,7 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
     return ConversationHandler.END
 
-# === Main Start ===
+# Start Bot
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
@@ -230,5 +217,6 @@ if __name__ == '__main__':
         fallbacks=[]
     )
     app.add_handler(conv)
+
     app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
     app.run_polling()
