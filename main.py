@@ -154,3 +154,89 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.run_polling()
+    # === Fahrer anlegen ===
+async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.delete()
+    await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
+    return VORNAME
+
+async def vorname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"] = {"vorname": update.message.text}
+    await update.message.delete()
+    await update.message.reply_text("Nachname:", reply_markup=ReplyKeyboardRemove())
+    return NACHNAME
+
+async def nachname(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["nachname"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Geburtstag:")
+    return GEBURTSTAG
+
+async def geburtstag(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["geburtstag"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Nationalität:")
+    return NATIONALITÄT
+
+async def nationalität(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    flag = FLAGGEN.get(update.message.text.lower(), "🌍")
+    context.user_data["fahrer"]["nationalität"] = flag
+    await update.message.delete()
+    await update.message.reply_text("Sprache:")
+    return SPRACHE
+
+async def sprache(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    sprache = SPRACHEN.get(update.message.text.lower(), "🗣️")
+    context.user_data["fahrer"]["sprache"] = sprache
+    await update.message.delete()
+    await update.message.reply_text("Mobilnummer:")
+    return MOBIL
+
+async def mobil(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["mobil"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("Angestellt seit:")
+    return EINTRITT
+
+async def eintritt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["seit"] = update.message.text
+    await update.message.delete()
+    await update.message.reply_text("4-stelliger PIN:")
+    return PIN
+
+async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["fahrer"]["pin"] = update.message.text
+    fahrerliste = context.application.bot_data.setdefault("fahrer", [])
+    neue_id = f"F{len(fahrerliste)+1:04}"
+    context.user_data["fahrer"]["id"] = neue_id
+    fahrerliste.append(context.user_data["fahrer"])
+    await update.message.delete()
+    await update.message.reply_text("✅ Fahrer gespeichert. Übersicht:")
+    text = "\n".join([f"{f['id']} – {f['vorname']} {f['nachname']} {f['sprache']} {f['nationalität']}" for f in fahrerliste])
+    await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
+    return ConversationHandler.END
+
+# === Bot starten ===
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    conv = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex("^(🆕 NEU|🆕\\sNEU)$"), neu_fahrer)],
+        states={
+            VORNAME: [MessageHandler(filters.TEXT, vorname)],
+            NACHNAME: [MessageHandler(filters.TEXT, nachname)],
+            GEBURTSTAG: [MessageHandler(filters.TEXT, geburtstag)],
+            NATIONALITÄT: [MessageHandler(filters.TEXT, nationalität)],
+            SPRACHE: [MessageHandler(filters.TEXT, sprache)],
+            MOBIL: [MessageHandler(filters.TEXT, mobil)],
+            EINTRITT: [MessageHandler(filters.TEXT, eintritt)],
+            PIN: [MessageHandler(filters.TEXT, pin)],
+        },
+        fallbacks=[]
+    )
+    app.add_handler(conv)
+
+    app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
+    app.run_polling()
