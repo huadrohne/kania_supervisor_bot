@@ -47,8 +47,7 @@ def get_alle_menu():
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     context.chat_data[cid] = {"state": "start", "last_active": datetime.datetime.utcnow()}
-    await update.message.reply_text("Willkommen 👋
-Bitte wähle deine Rolle:", reply_markup=get_main_menu())
+    await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=get_main_menu())
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -88,8 +87,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("📂 LOGIN CEO ➜ FIRMA ➜ FAHRER", reply_markup=get_fahrer_menu())
 
     elif data == "zurueck_start":
-        await query.message.reply_text("Willkommen 👋
-Bitte wähle deine Rolle:", reply_markup=get_main_menu())
+        await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=get_main_menu())
 
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
