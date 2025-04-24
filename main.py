@@ -1,12 +1,13 @@
 import asyncio
 import datetime
 import os
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
     filters, ContextTypes, ConversationHandler
 )
 
+# Konstanten
 (VORNAME, NACHNAME, GEBURTSTAG, NATIONALITÄT, SPRACHE, MOBIL, EINTRITT, PIN) = range(8)
 
 FLAGGEN = {
@@ -16,26 +17,30 @@ SPRACHEN = {
     "deutsch": "🗣️🇩🇪", "polnisch": "🗣️🇵🇱", "englisch": "🗣️🇬🇧", "türkisch": "🗣️🇹🇷"
 }
 
-def custom_markup(buttons):
+def markup(buttons):
     return ReplyKeyboardMarkup(
         buttons,
         resize_keyboard=True,
         one_time_keyboard=False,
         is_persistent=True,
-        input_field_placeholder=""
+        selective=True,
+        input_field_placeholder="",
+        placeholder=""
     )
 
-main_markup = custom_markup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']])
-ceo_markup = custom_markup([['🏢 FIRMA', '⬅️ ZURÜCK']])
-firma_markup = custom_markup([['👷 FAHRER', '⬅️ ZURÜCK']])
-fahrer_markup = custom_markup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']])
-ersatz_markup = custom_markup([['⬅️ ZURÜCK']])
-alle_markup = custom_markup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']])
-fahrer_login_markup = custom_markup([['⬅️ ZURÜCK']])
+# Menüs
+main_markup = markup([['🚚 LOGIN FAHRER', '👔 LOGIN CEO']])
+ceo_markup = markup([['🏢 FIRMA', '⬅️ ZURÜCK']])
+firma_markup = markup([['👷 FAHRER', '⬅️ ZURÜCK']])
+fahrer_markup = markup([['📋 ALLE', '🔄 ERSATZ', '⬅️ ZURÜCK']])
+ersatz_markup = markup([['⬅️ ZURÜCK']])
+alle_markup = markup([['🆕 NEU', '✏️ ÄNDERN', '⬅️ ZURÜCK']])
+fahrer_login_markup = markup([['⬅️ ZURÜCK']])
 
 RESET_MINUTES = 2
 BRANDING_PATH = "branding.png"
 
+# Start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if update.message:
@@ -47,6 +52,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "start_msg": msg.message_id
     }
 
+# Reset bei Inaktivität
 async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.utcnow()
     for chat_id, data in context.chat_data.items():
@@ -55,6 +61,7 @@ async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_markup)
             context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
+# Button Handling
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message.text
     cid = update.effective_chat.id
@@ -63,10 +70,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
     chat_state["last_active"] = datetime.datetime.utcnow()
 
-    old_message = chat_state.get("status_msg")
-    if old_message:
+    if chat_state.get("status_msg"):
         try:
-            await context.bot.delete_message(cid, old_message)
+            await context.bot.delete_message(cid, chat_state["status_msg"])
         except:
             pass
         chat_state["status_msg"] = None
@@ -124,11 +130,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_state["status_msg"] = m.message_id
 
     elif msg == "⬅️ ZURÜCK":
-        if chat_state.get("state") == "alle":
-            m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER", reply_markup=fahrer_markup)
-            chat_state["state"] = "fahrer"
-            chat_state["status_msg"] = m.message_id
-        elif chat_state.get("state") == "ersatz":
+        if chat_state.get("state") == "alle" or chat_state.get("state") == "ersatz":
             m = await context.bot.send_message(cid, "LOGIN CEO/ FIRMA/ FAHRER", reply_markup=fahrer_markup)
             chat_state["state"] = "fahrer"
             chat_state["status_msg"] = m.message_id
@@ -137,15 +139,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_state["state"] = "firma"
             chat_state["status_msg"] = m.message_id
         elif chat_state.get("state") == "login_fahrer":
-            new_msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+            msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
             chat_state["state"] = "start"
-            chat_state["start_msg"] = new_msg.message_id
+            chat_state["start_msg"] = msg.message_id
         else:
-            new_msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
+            msg = await context.bot.send_message(cid, "Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_markup)
             chat_state["state"] = "start"
-            chat_state["start_msg"] = new_msg.message_id
+            chat_state["start_msg"] = msg.message_id
 
-# === Fahrer anlegen ===
+# === Fahreranlage ===
 async def neu_fahrer(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.delete()
     await context.bot.send_message(update.effective_chat.id, "Bitte gib den Vornamen des Fahrers ein:")
@@ -202,12 +204,12 @@ async def pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["fahrer"]["id"] = neue_id
     fahrerliste.append(context.user_data["fahrer"])
     await update.message.delete()
-    await update.message.reply_text("✅ Fahrer gespeichert. Übersicht:")
+    await update.message.reply_text("✅ Fahrer gespeichert.")
     text = "\n".join([f"{f['id']} – {f['vorname']} {f['nachname']} {f['sprache']} {f['nationalität']}" for f in fahrerliste])
     await update.message.reply_text(f"📋 Fahrerübersicht:\n{text}", reply_markup=alle_markup)
     return ConversationHandler.END
 
-# === Bot starten ===
+# === Main Start ===
 if __name__ == '__main__':
     app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
@@ -228,6 +230,5 @@ if __name__ == '__main__':
         fallbacks=[]
     )
     app.add_handler(conv)
-
     app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
     app.run_polling()
