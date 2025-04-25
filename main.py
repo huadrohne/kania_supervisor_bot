@@ -33,6 +33,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_state[chat_id] = "start"
     user_last_active[chat_id] = time.time()
+
+    if update.message:
+        try:
+            await update.message.delete()
+        except:
+            pass
+
     await delete_previous_messages(context, chat_id)
 
     # Branding
@@ -40,7 +47,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(3)
     await context.bot.delete_message(chat_id=chat_id, message_id=branding.message_id)
 
-    # Starttext mit Buttons
+    # Buttons
     msg = await context.bot.send_message(
         chat_id=chat_id,
         text="Willkommen 👋\nBitte wähle deine Rolle:",
@@ -53,8 +60,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     chat_id = query.message.chat_id
-
     user_last_active[chat_id] = time.time()
+
     await delete_previous_messages(context, chat_id)
 
     # LOGIN FAHRER
@@ -86,11 +93,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO", reply_markup=reply_markup)
         user_messages[chat_id] = [msg.message_id]
 
-    # ZURÜCK
+    # ZURÜCK zu Start
     elif data == "start":
         await start(update, context)
 
-def reset_inactive_users(app):
+# Inaktivitäts-Reset über on_startup
+async def on_startup(app: Application):
     async def reset():
         while True:
             now = time.time()
@@ -103,8 +111,7 @@ def reset_inactive_users(app):
 
 if __name__ == "__main__":
     token = os.getenv("BOT_TOKEN")
-    app = Application.builder().token(token).build()
+    app = Application.builder().token(token).post_init(on_startup).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
-    reset_inactive_users(app)
     app.run_polling()
