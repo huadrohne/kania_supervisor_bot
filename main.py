@@ -1,124 +1,116 @@
-import os
-import time
-import json
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from dotenv import load_dotenv
+import datetime
+import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, CallbackQueryHandler,
+    ContextTypes, ConversationHandler, MessageHandler, filters
+)
 
-load_dotenv()
+RESET_MINUTES = 2
+BRANDING_PATH = "branding.png"
 
-user_state = {}
-user_messages = {}
-user_last_active = {}
+def inline_keyboard(buttons):
+    return InlineKeyboardMarkup([[InlineKeyboardButton(text, callback_data=data)] for text, data in buttons])
 
-branding_path = "branding.png"
-
-def get_start_buttons():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚛 LOGIN FAHRER", callback_data="login_fahrer"),
-         InlineKeyboardButton("👔 LOGIN CEO", callback_data="login_ceo")]
-    ])
-
-async def delete_previous_messages(context: ContextTypes.DEFAULT_TYPE, chat_id):
-    if chat_id in user_messages:
-        for msg_id in user_messages[chat_id]:
-            try:
-                await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
-            except:
-                pass
-        user_messages[chat_id] = []
+main_menu = inline_keyboard([("🚛 LOGIN FAHRER", "login_fahrer"), ("👔 LOGIN CEO", "login_ceo")])
+zurück_button = inline_keyboard([("⬅️ ZURÜCK", "zurück")])
+firma_menu = inline_keyboard([("🏢 FIRMA", "firma"), ("⬅️ ZURÜCK", "zurück")])
+fahrer_menu = inline_keyboard([("👷 FAHRER", "fahrer"), ("⬅️ ZURÜCK", "zurück")])
+alle_menu = inline_keyboard([("📋 ALLE", "alle"), ("🔄 ERSATZ", "ersatz"), ("⬅️ ZURÜCK", "zurück")])
+ersatz_menu = inline_keyboard([("⬅️ ZURÜCK", "zurück")])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    user_state[chat_id] = "start"
-    user_last_active[chat_id] = time.time()
+    context.chat_data[update.effective_chat.id] = {"state": "start", "last_active": datetime.datetime.utcnow()}
+    await update.message.delete()
+    msg = await update.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
+    context.chat_data[update.effective_chat.id]["menu_msg"] = msg.message_id
 
-    # Entferne /start Nachricht
-    if update.message:
-        try:
-            await update.message.delete()
-        except:
-            pass
+async def reset_user_menu(context: ContextTypes.DEFAULT_TYPE):
+    now = datetime.datetime.utcnow()
+    for chat_id, data in context.chat_data.items():
+        last_active = data.get("last_active")
+        if last_active and (now - last_active).total_seconds() > RESET_MINUTES * 60:
+            await context.bot.send_message(chat_id, "⏳ Zurück zum Hauptmenü", reply_markup=main_menu)
+            context.chat_data[chat_id] = {"state": "start", "last_active": now}
 
-    await delete_previous_messages(context, chat_id)
+async def send_branding(context, chat_id):
+    branding = await context.bot.send_photo(chat_id, photo=open(BRANDING_PATH, "rb"))
+    text = await context.bot.send_message(chat_id, "Lizensiert für Kania Schüttguttransporte")
+    await asyncio.sleep(2)
+    await branding.delete()
+    await text.delete()
 
-    # Branding
-    branding = await context.bot.send_photo(chat_id=chat_id, photo=InputFile(branding_path))
-    await asyncio.sleep(3)
-    await context.bot.delete_message(chat_id=chat_id, message_id=branding.message_id)
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    cid = query.message.chat_id
+    await query.answer()
+    state = context.chat_data.setdefault(cid, {"state": "start", "last_active": datetime.datetime.utcnow()})
+    state["last_active"] = datetime.datetime.utcnow()
 
-    # Startbuttons
-    msg = await context.bot.send_message(
-        chat_id=chat_id,
-        text="Willkommen 👋\nBitte wähle deine Rolle:",
-        reply_markup=get_start_buttons()
-    )
-    user_messages[chat_id] = [msg.message_id]
+    # alte Statusnachricht löschen
+    if "status_msg" in state:
+        try:
+            await context.bot.delete_message(cid, state["status_msg"])
+        except:
+            pass
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    chat_id = query.message.chat_id
-    user_last_active[chat_id] = time.time()
+    # Menü-Nachricht löschen
+    if "menu_msg" in state:
+        try:
+            await context.bot.delete_message(cid, state["menu_msg"])
+        except:
+            pass
 
-    await delete_previous_messages(context, chat_id)
+    cmd = query.data
 
-    if data == "login_fahrer":
-        msg = await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform")
-        keyboard = [
-            [InlineKeyboardButton("📅 KALENDER", callback_data="kalender_fahrer")],
-            [InlineKeyboardButton("🛠️ SUPERVISOR", callback_data="supervisor")],
-            [InlineKeyboardButton("🌄 TOUREN", callback_data="touren")],
-            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="start")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN FAHRER", reply_markup=reply_markup)
-        user_state[chat_id] = "login_fahrer"
-        user_messages[chat_id] = [msg.message_id]
+    if cmd == "login_fahrer":
+        await send_branding(context, cid)
+        msg = await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform", reply_markup=zurück_button)
+        state.update({"state": "login_fahrer", "status_msg": msg.message_id})
 
-    elif data == "login_ceo":
-        msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform")
-        keyboard = [
-            [InlineKeyboardButton("🏢 BÜRO", callback_data="buero")],
-            [InlineKeyboardButton("📅 KALENDER", callback_data="kalender_ceo")],
-            [InlineKeyboardButton("🆘 SUPPORT", callback_data="support")],
-            [InlineKeyboardButton("🏢 FIRMA", callback_data="firma")],
-            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="start")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO", reply_markup=reply_markup)
-        user_state[chat_id] = "login_ceo"
-        user_messages[chat_id] = [msg.message_id]
+    elif cmd == "login_ceo":
+        await send_branding(context, cid)
+        msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=firma_menu)
+        state.update({"state": "ceo", "status_msg": msg.message_id})
 
-    elif data == "firma":
-        msg = await query.message.reply_text("🏢 Firmenbereich")
-        keyboard = [
-            [InlineKeyboardButton("🧑‍✈️ FAHRER", callback_data="fahrer")],
-            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="login_ceo")]
-        ]
-        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO ➜ FIRMA", reply_markup=InlineKeyboardMarkup(keyboard))
-        user_state[chat_id] = "firma"
-        user_messages[chat_id] = [msg.message_id]
+    elif cmd == "firma":
+        msg = await query.message.reply_text("LOGIN CEO/ FIRMA", reply_markup=fahrer_menu)
+        state.update({"state": "firma", "status_msg": msg.message_id})
 
-    elif data == "fahrer":
-        msg = await query.message.reply_text("📋 Fahrerbereich")
-        keyboard = [
-            [InlineKeyboardButton("📋 ALLE", callback_data="alle")],
-            [InlineKeyboardButton("🔄 ERSATZ", callback_data="ersatz")],
-            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="firma")]
-        ]
-        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO ➜ FIRMA ➜ FAHRER", reply_markup=InlineKeyboardMarkup(keyboard))
-        user_state[chat_id] = "fahrer"
-        user_messages[chat_id] = [msg.message_id]
+    elif cmd == "fahrer":
+        msg = await query.message.reply_text("LOGIN CEO/ FIRMA/ FAHRER", reply_markup=alle_menu)
+        state.update({"state": "fahrer", "status_msg": msg.message_id})
 
-    elif data == "start":
-        await start(update, context)
+    elif cmd == "alle":
+        msg = await query.message.reply_text("📋 Fahrerübersicht: Keine Fahrer vorhanden.", reply_markup=alle_menu)
+        state.update({"state": "alle", "status_msg": msg.message_id})
 
-if __name__ == "__main__":
-    token = os.getenv("BOT_TOKEN")
-    app = Application.builder().token(token).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button_handler))
-    app.run_polling()
+    elif cmd == "ersatz":
+        msg = await query.message.reply_text("🔄 Ersatzfahrer-Verwaltung", reply_markup=ersatz_menu)
+        state.update({"state": "ersatz", "status_msg": msg.message_id})
+
+    elif cmd == "zurück":
+        prev = state.get("state")
+        if prev == "alle" or prev == "ersatz":
+            msg = await query.message.reply_text("LOGIN CEO/ FIRMA/ FAHRER", reply_markup=alle_menu)
+            state.update({"state": "fahrer", "status_msg": msg.message_id})
+        elif prev == "fahrer":
+            msg = await query.message.reply_text("LOGIN CEO/ FIRMA", reply_markup=fahrer_menu)
+            state.update({"state": "firma", "status_msg": msg.message_id})
+        elif prev == "firma":
+            msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform", reply_markup=firma_menu)
+            state.update({"state": "ceo", "status_msg": msg.message_id})
+        elif prev == "login_fahrer" or prev == "ceo":
+            msg = await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
+            state.update({"state": "start", "menu_msg": msg.message_id})
+        else:
+            msg = await query.message.reply_text("Willkommen 👋\nBitte wähle deine Rolle:", reply_markup=main_menu)
+            state.update({"state": "start", "menu_msg": msg.message_id})
+
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(os.getenv("BOT_TOKEN")).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(handle_buttons))
+    app.job_queue.run_repeating(reset_user_menu, interval=60, first=60)
+    app.run_polling()
