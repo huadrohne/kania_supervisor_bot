@@ -1,6 +1,6 @@
 import os
-import json
 import time
+import json
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -34,6 +34,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_state[chat_id] = "start"
     user_last_active[chat_id] = time.time()
 
+    # Entferne /start Nachricht
     if update.message:
         try:
             await update.message.delete()
@@ -47,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await asyncio.sleep(3)
     await context.bot.delete_message(chat_id=chat_id, message_id=branding.message_id)
 
-    # Buttons
+    # Startbuttons
     msg = await context.bot.send_message(
         chat_id=chat_id,
         text="Willkommen 👋\nBitte wähle deine Rolle:",
@@ -64,7 +65,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await delete_previous_messages(context, chat_id)
 
-    # LOGIN FAHRER
     if data == "login_fahrer":
         msg = await query.message.reply_text("✅ Willkommen auf der Fahrer Plattform")
         keyboard = [
@@ -74,11 +74,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        user_state[chat_id] = "login_fahrer"
         await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN FAHRER", reply_markup=reply_markup)
+        user_state[chat_id] = "login_fahrer"
         user_messages[chat_id] = [msg.message_id]
 
-    # LOGIN CEO
     elif data == "login_ceo":
         msg = await query.message.reply_text("✅ Willkommen auf der CEO Plattform")
         keyboard = [
@@ -89,29 +88,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="start")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        user_state[chat_id] = "login_ceo"
         await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO", reply_markup=reply_markup)
+        user_state[chat_id] = "login_ceo"
         user_messages[chat_id] = [msg.message_id]
 
-    # ZURÜCK zu Start
+    elif data == "firma":
+        msg = await query.message.reply_text("🏢 Firmenbereich")
+        keyboard = [
+            [InlineKeyboardButton("🧑‍✈️ FAHRER", callback_data="fahrer")],
+            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="login_ceo")]
+        ]
+        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO ➜ FIRMA", reply_markup=InlineKeyboardMarkup(keyboard))
+        user_state[chat_id] = "firma"
+        user_messages[chat_id] = [msg.message_id]
+
+    elif data == "fahrer":
+        msg = await query.message.reply_text("📋 Fahrerbereich")
+        keyboard = [
+            [InlineKeyboardButton("📋 ALLE", callback_data="alle")],
+            [InlineKeyboardButton("🔄 ERSATZ", callback_data="ersatz")],
+            [InlineKeyboardButton("⬅️ ZURÜCK", callback_data="firma")]
+        ]
+        await context.bot.send_message(chat_id=chat_id, text="📂 LOGIN CEO ➜ FIRMA ➜ FAHRER", reply_markup=InlineKeyboardMarkup(keyboard))
+        user_state[chat_id] = "fahrer"
+        user_messages[chat_id] = [msg.message_id]
+
     elif data == "start":
         await start(update, context)
 
-# Inaktivitäts-Reset über on_startup
-async def on_startup(app: Application):
-    async def reset():
-        while True:
-            now = time.time()
-            for chat_id in list(user_last_active):
-                if now - user_last_active[chat_id] > 120:
-                    user_state[chat_id] = "start"
-                    del user_last_active[chat_id]
-            await asyncio.sleep(60)
-    app.create_task(reset())
-
 if __name__ == "__main__":
     token = os.getenv("BOT_TOKEN")
-    app = Application.builder().token(token).post_init(on_startup).build()
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.run_polling()
