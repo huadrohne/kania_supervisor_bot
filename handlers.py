@@ -446,7 +446,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             elif prev in ["awaiting_tour_start_km", "awaiting_tour_ziel", "awaiting_tour_ende_km"]:
                 msg = await query.message.reply_text("📂 FAHRER → TOUR\n\n🛣️ Tour-Verwaltung", reply_markup=kb.TOUR_MENU)
-                state.update({"state": "fahrer
+                state.update({"state": "fahrer_tour", "status_msg": msg.message_id})
 
               elif prev in ["awaiting_tour_start_km", "awaiting_tour_ziel", "awaiting_tour_ende_km"]:
                 msg = await query.message.reply_text("📂 FAHRER → TOUR\n\n🛣️ Tour-Verwaltung", reply_markup=kb.TOUR_MENU)
