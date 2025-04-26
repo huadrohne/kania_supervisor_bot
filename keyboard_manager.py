@@ -70,6 +70,9 @@ KALENDER_CEO_MENU_BUTTONS = [
 
 # Support Bereich
 SUPPORT_MENU_BUTTONS = [
+    ("❓ FAQ", "support_faq"),
+    ("✉️ KONTAKT", "support_kontakt"),
+    ("⚙️ TECHNIK", "support_technik"),
     ("⬅️ ZURÜCK", "zurück")
 ]
 
@@ -168,7 +171,7 @@ BUERO_MENU = create_inline_keyboard(BUERO_MENU_BUTTONS, row_width=1)
 FIRMA_MENU = create_inline_keyboard(FIRMA_MENU_BUTTONS, row_width=2)
 NEWS_MENU = create_inline_keyboard(NEWS_MENU_BUTTONS, row_width=1)
 KALENDER_CEO_MENU = create_inline_keyboard(KALENDER_CEO_MENU_BUTTONS, row_width=1)
-SUPPORT_MENU = create_inline_keyboard(SUPPORT_MENU_BUTTONS, row_width=1)
+SUPPORT_MENU = create_inline_keyboard(SUPPORT_MENU_BUTTONS, row_width=2)
 FAHRER_MENU = create_inline_keyboard(FAHRER_MENU_BUTTONS, row_width=2)
 ÜBERSICHT_MENU = create_inline_keyboard(ÜBERSICHT_MENU_BUTTONS, row_width=2)
 ERSATZ_MENU = create_inline_keyboard(ERSATZ_MENU_BUTTONS, row_width=1)
