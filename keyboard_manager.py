@@ -1,8 +1,17 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-def create_inline_keyboard(buttons):
-    """Creates an inline keyboard from a list of (text, callback_data) tuples."""
-    return InlineKeyboardMarkup([[InlineKeyboardButton(text, callback_data=data)] for text, data in buttons])
+def create_inline_keyboard(buttons, row_width=2):
+    """Creates an inline keyboard with multiple buttons per row."""
+    keyboard = []
+    row = []
+    for text, data in buttons:
+        row.append(InlineKeyboardButton(text, callback_data=data))
+        if len(row) >= row_width:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    return InlineKeyboardMarkup(keyboard)
 
 # =========================
 # Buttons Definitionen
@@ -64,7 +73,7 @@ SUPPORT_MENU_BUTTONS = [
     ("⬅️ ZURÜCK", "zurück")
 ]
 
-# Fahrer Bereich (unter Firma)
+# Fahrer Bereich unter Firma
 FAHRER_MENU_BUTTONS = [
     ("📋 ÜBERSICHT", "übersicht"),
     ("🔄 ERSATZFAHRER", "ersatz"),
@@ -120,21 +129,21 @@ SCHAEDEN_MENU_BUTTONS = [
     ("⬅️ ZURÜCK", "zurück")
 ]
 
-# Tour Bereich (für Fahrer)
+# Tour Bereich
 TOUR_MENU_BUTTONS = [
     ("🚀 TOUR STARTEN", "tour_starten"),
     ("⏹️ TOUR BEENDEN", "tour_beenden"),
     ("⬅️ ZURÜCK", "zurück")
 ]
 
-# Supervisor Bereich (für Fahrer)
+# Supervisor Bereich
 SUPERVISOR_MENU_BUTTONS = [
     ("📞 KONTAKT", "supervisor_kontakt"),
     ("📝 NACHRICHT", "supervisor_nachricht"),
     ("⬅️ ZURÜCK", "zurück")
 ]
 
-# Kalender Bereich (für Fahrer)
+# Kalender Bereich Fahrer
 KALENDER_MENU_BUTTONS = [
     ("📊 ÜBERSICHT", "kalender_übersicht"),
     ("📝 MEINE TOUREN", "kalender_touren"),
@@ -151,24 +160,24 @@ CONFIRM_KEYBOARD_BUTTONS = [
 # Keyboards bauen
 # =========================
 
-MAIN_MENU = create_inline_keyboard(MAIN_MENU_BUTTONS)
-ZURÜCK_BUTTON = create_inline_keyboard(ZURÜCK_BUTTONS)
-FAHRER_BEREICH_MENU = create_inline_keyboard(FAHRER_BEREICH_BUTTONS)
-CEO_MENU = create_inline_keyboard(CEO_MENU_BUTTONS)
-BUERO_MENU = create_inline_keyboard(BUERO_MENU_BUTTONS)
-FIRMA_MENU = create_inline_keyboard(FIRMA_MENU_BUTTONS)
-NEWS_MENU = create_inline_keyboard(NEWS_MENU_BUTTONS)
-KALENDER_CEO_MENU = create_inline_keyboard(KALENDER_CEO_MENU_BUTTONS)
-SUPPORT_MENU = create_inline_keyboard(SUPPORT_MENU_BUTTONS)
-FAHRER_MENU = create_inline_keyboard(FAHRER_MENU_BUTTONS)
-ÜBERSICHT_MENU = create_inline_keyboard(ÜBERSICHT_MENU_BUTTONS)
-ERSATZ_MENU = create_inline_keyboard(ERSATZ_MENU_BUTTONS)
-FAHRZEUGE_MENU = create_inline_keyboard(FAHRZEUGE_MENU_BUTTONS)
-LKW_MENU = create_inline_keyboard(LKW_MENU_BUTTONS)
-KFZ_MENU = create_inline_keyboard(KFZ_MENU_BUTTONS)
-TUEV_MENU = create_inline_keyboard(TUEV_MENU_BUTTONS)
-SCHAEDEN_MENU = create_inline_keyboard(SCHAEDEN_MENU_BUTTONS)
-TOUR_MENU = create_inline_keyboard(TOUR_MENU_BUTTONS)
-SUPERVISOR_MENU = create_inline_keyboard(SUPERVISOR_MENU_BUTTONS)
-KALENDER_MENU = create_inline_keyboard(KALENDER_MENU_BUTTONS)
-CONFIRM_KEYBOARD = create_inline_keyboard(CONFIRM_KEYBOARD_BUTTONS)
+MAIN_MENU = create_inline_keyboard(MAIN_MENU_BUTTONS, row_width=2)
+ZURÜCK_BUTTON = create_inline_keyboard(ZURÜCK_BUTTONS, row_width=1)
+FAHRER_BEREICH_MENU = create_inline_keyboard(FAHRER_BEREICH_BUTTONS, row_width=2)
+CEO_MENU = create_inline_keyboard(CEO_MENU_BUTTONS, row_width=2)
+BUERO_MENU = create_inline_keyboard(BUERO_MENU_BUTTONS, row_width=1)
+FIRMA_MENU = create_inline_keyboard(FIRMA_MENU_BUTTONS, row_width=2)
+NEWS_MENU = create_inline_keyboard(NEWS_MENU_BUTTONS, row_width=1)
+KALENDER_CEO_MENU = create_inline_keyboard(KALENDER_CEO_MENU_BUTTONS, row_width=1)
+SUPPORT_MENU = create_inline_keyboard(SUPPORT_MENU_BUTTONS, row_width=1)
+FAHRER_MENU = create_inline_keyboard(FAHRER_MENU_BUTTONS, row_width=2)
+ÜBERSICHT_MENU = create_inline_keyboard(ÜBERSICHT_MENU_BUTTONS, row_width=2)
+ERSATZ_MENU = create_inline_keyboard(ERSATZ_MENU_BUTTONS, row_width=1)
+FAHRZEUGE_MENU = create_inline_keyboard(FAHRZEUGE_MENU_BUTTONS, row_width=2)
+LKW_MENU = create_inline_keyboard(LKW_MENU_BUTTONS, row_width=2)
+KFZ_MENU = create_inline_keyboard(KFZ_MENU_BUTTONS, row_width=2)
+TUEV_MENU = create_inline_keyboard(TUEV_MENU_BUTTONS, row_width=1)
+SCHAEDEN_MENU = create_inline_keyboard(SCHAEDEN_MENU_BUTTONS, row_width=2)
+TOUR_MENU = create_inline_keyboard(TOUR_MENU_BUTTONS, row_width=2)
+SUPERVISOR_MENU = create_inline_keyboard(SUPERVISOR_MENU_BUTTONS, row_width=2)
+KALENDER_MENU = create_inline_keyboard(KALENDER_MENU_BUTTONS, row_width=2)
+CONFIRM_KEYBOARD = create_inline_keyboard(CONFIRM_KEYBOARD_BUTTONS, row_width=2)
