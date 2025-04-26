@@ -90,21 +90,32 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         state.update({"state": "support", "status_msg": msg.message_id})
 
-    # ====== ZURÜCK BUTTON ======
+    # ====== FAHRER UNTERMENÜS (später falls mehr kommt) ======
+    # (Hier kannst du später weitere Fahrer-Unterbereiche ergänzen.)
+
+    # ====== ZURÜCK BUTTON LOGIK ======
     elif cmd == "zurück":
         prev = state.get("state")
 
-        if prev in ["login_fahrer", "ceo", "buero", "firma", "kalender_ceo", "news", "support"]:
+        if prev and prev.startswith("login_fahrer") or prev.startswith("fahrer") or prev.startswith("tour") or prev.startswith("supervisor") or prev.startswith("kalender"):
+            msg = await query.message.reply_text(
+                "✅ Willkommen auf der Fahrer Plattform",
+                reply_markup=kb.FAHRER_BEREICH_MENU
+            )
+            state.update({"state": "login_fahrer", "menu_msg": msg.message_id})
+
+        elif prev and (prev.startswith("ceo") or prev.startswith("buero") or prev.startswith("firma") or prev.startswith("kalender_ceo") or prev.startswith("news") or prev.startswith("support")):
             msg = await query.message.reply_text(
                 "✅ Willkommen auf der CEO Plattform",
                 reply_markup=kb.CEO_MENU
             )
             state.update({"state": "ceo", "menu_msg": msg.message_id})
+
         else:
             msg = await query.message.reply_text(
                 "Willkommen 👋\nBitte wähle deine Rolle:",
                 reply_markup=kb.MAIN_MENU
             )
             state.update({"state": "start", "menu_msg": msg.message_id})
-        
+
         return ConversationHandler.END
