@@ -1,4 +1,3 @@
-```python
 import asyncio
 import datetime
 import logging
@@ -98,4 +97,3 @@ async def handle_fahrer_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_search_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle search term input."""
     return ConversationHandler.END
-```
