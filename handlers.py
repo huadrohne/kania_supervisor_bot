@@ -173,3 +173,11 @@ async def handle_tour_ziel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_tour_ende_km(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Dummy handler for tour ende km."""
     return ConversationHandler.END
+    
+async def handle_supervisor_nachricht(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Dummy handler for supervisor nachricht."""
+    cid = update.effective_chat.id
+    await update.message.delete()
+    msg = await update.message.reply_text("Diese Funktion ist noch nicht implementiert.", reply_markup=kb.ZURÜCK_BUTTON)
+    context.chat_data[cid]["status_msg"] = msg.message_id
+    return ConversationHandler.END
