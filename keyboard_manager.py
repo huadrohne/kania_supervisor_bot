@@ -29,10 +29,11 @@ FAHRER_BEREICH_BUTTONS = [
 
 # CEO Bereich Menü
 CEO_MENU_BUTTONS = [
-    ("🗂️ BÜRO", "buero"),
+    ("💼 BÜRO", "buero"),
     ("🏢 FIRMA", "firma"),
-    ("📰 NEWS", "news"),
     ("📅 KALENDER CEO", "kalender_ceo"),
+    ("📰 NEWS", "news"),
+    ("⚙️ SUPPORT", "support"),
     ("⬅️ ZURÜCK", "zurück")
 ]
 
@@ -55,6 +56,11 @@ NEWS_MENU_BUTTONS = [
 
 # Kalender CEO Bereich
 KALENDER_CEO_MENU_BUTTONS = [
+    ("⬅️ ZURÜCK", "zurück")
+]
+
+# Support Bereich
+SUPPORT_MENU_BUTTONS = [
     ("⬅️ ZURÜCK", "zurück")
 ]
 
@@ -153,6 +159,7 @@ BUERO_MENU = create_inline_keyboard(BUERO_MENU_BUTTONS)
 FIRMA_MENU = create_inline_keyboard(FIRMA_MENU_BUTTONS)
 NEWS_MENU = create_inline_keyboard(NEWS_MENU_BUTTONS)
 KALENDER_CEO_MENU = create_inline_keyboard(KALENDER_CEO_MENU_BUTTONS)
+SUPPORT_MENU = create_inline_keyboard(SUPPORT_MENU_BUTTONS)
 FAHRER_MENU = create_inline_keyboard(FAHRER_MENU_BUTTONS)
 ÜBERSICHT_MENU = create_inline_keyboard(ÜBERSICHT_MENU_BUTTONS)
 ERSATZ_MENU = create_inline_keyboard(ERSATZ_MENU_BUTTONS)
