@@ -90,6 +90,28 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         state.update({"state": "support", "status_msg": msg.message_id})
 
+    # ====== SUPPORT UNTERMENÜS ======
+    elif cmd == "support_faq":
+        msg = await query.message.reply_text(
+            "❓ FAQ:\n\n1. Wie melde ich mich an?\n2. Wie starte ich eine Tour?\n3. Was tun bei Problemen?\n\n(Support-FAQ wird später erweitert.)",
+            reply_markup=kb.SUPPORT_MENU
+        )
+        state.update({"state": "support_faq", "status_msg": msg.message_id})
+
+    elif cmd == "support_kontakt":
+        msg = await query.message.reply_text(
+            "✉️ Kontakt:\n\nBitte sende eine E-Mail an:\n**support@kania-transporte.de**",
+            reply_markup=kb.SUPPORT_MENU
+        )
+        state.update({"state": "support_kontakt", "status_msg": msg.message_id})
+
+    elif cmd == "support_technik":
+        msg = await query.message.reply_text(
+            "⚙️ Technischer Support:\n\nKontaktiere @KaniaSupportBot auf Telegram.",
+            reply_markup=kb.SUPPORT_MENU
+        )
+        state.update({"state": "support_technik", "status_msg": msg.message_id})
+
     # ====== ZURÜCK BUTTON LOGIK ======
     elif cmd == "zurück":
         prev = state.get("state")
@@ -109,7 +131,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             state.update({"state": "login_fahrer", "menu_msg": msg.message_id})
 
-        elif prev and prev.startswith(("buero", "firma", "kalender_ceo", "news", "support")):
+        elif prev and prev.startswith(("buero", "firma", "kalender_ceo", "news", "support", "support_faq", "support_kontakt", "support_technik")):
             msg = await query.message.reply_text(
                 "✅ Willkommen auf der CEO Plattform",
                 reply_markup=kb.CEO_MENU
